@@ -1,9 +1,12 @@
+# ---- Python ----
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+build/
 develop-eggs/
+dist/
 downloads/
 eggs/
 .eggs/
@@ -19,11 +22,42 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# ---- environments ----
 env/
 venv/
+.venv/
 ENV/
 env.bak/
 venv.bak/
 
+# ---- editors ----
 .vscode/
 .idea/
+*.swp
+
+# ---- OS junk  ----
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+
+# ---- LaTeX build artefacts ----
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# ---- scratch ----
+*.npy
+logs/
+slurm-*.out
+scratch/
+

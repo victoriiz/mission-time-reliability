@@ -1,15 +1,7 @@
 """
 Headline experiment: decomposing the optimality gap into TIME and COMPONENT.
-Goes in: framework/dynamic_model/run_decomposition.py
 
-  python run_decomposition.py --restarts 2 --maxiter 400 --out decomposition.json
-
-run_ceiling_ladder.py runs the time-HOMOGENEOUS ladder
-(scalar / per_component / per_comp_repair) and does not touch decompose.py, so
-it cannot produce the reported finding. This driver does.
-
-Produces, in the order the write-up reads them:
-
+Produces
   0. correctness   recursion vs brute force; time-varying vs homogeneous;
                    DP vs naive simulation; double vs extended precision
   1. gate          h-transform audits to bias ~0, ESS ~1
@@ -17,10 +9,6 @@ Produces, in the order the write-up reads them:
                    horizon, with monotonicity and symmetry invariants
   3. sweep         the same rungs across mission lengths -- the headline
   4. payoff        p_T -> r_f -> A -> N_prod
-
-IMPORTANT: keep this file next to model.py. Every module here uses flat
-imports, so the driver must live in framework/dynamic_model/, not in a
-sibling experiments/ directory.
 """
 
 import argparse

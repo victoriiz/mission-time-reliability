@@ -15,22 +15,32 @@ estimate of the failure probability.
 
 ```
 framework/dynamic_model/
-  model.py              exact ground truth: backward DP, h-transform, validation gates
-  proposals.py          odds-tilt proposal families + the h-transform sequence
-  ceiling.py            exact second-moment recursion; family ceilings; brute-force check
-  decompose.py          time-varying recursion; the time-vs-component decomposition
-  audit.py              trajectory sampling audit with the stop-at-F rule
-  delta_calibration.py  Delta/DeltaAI parameters + the capacity-planning payoff
-  diagnose_tilt.py      minimal-cut geometry; the tilt-ordering diagnostic
-experiments/
-  run_ceiling_ladder.py end-to-end driver producing every reported number
+  model.py               exact ground truth: backward DP, h-transform, validation gates
+  proposals.py           odds-tilt proposal families + the h-transform sequence
+  ceiling.py             exact second-moment recursion; family ceilings; brute-force check
+  decompose.py           time-varying recursion; the time-vs-component decomposition
+  audit.py               trajectory sampling audit with the stop-at-F rule
+  delta_calibration.py   Delta/DeltaAI parameters + the capacity-planning payoff
+  diagnose_tilt.py       minimal-cut geometry; the tilt-ordering diagnostic
+  run_decomposition.py   HEADLINE driver: decomposition + horizon sweep
+  run_ceiling_ladder.py  time-homogeneous ladder only (scalar/per_component/+repair)
 ```
+
+**Every module uses flat imports, so both drivers must live beside `model.py`.**
+Moving them to a sibling `experiments/` directory fails with
+`ModuleNotFoundError: No module named 'model'`.
 
 ```bash
 pip install -r requirements.txt
-cd framework/dynamic_model && python model.py          # validation gates
-cd ../../experiments && python run_ceiling_ladder.py --N 8 --job-hours 2 --restarts 6
+cd framework/dynamic_model
+python model.py                                   # validation gates
+python run_decomposition.py --restarts 2          # headline: decomposition + sweep
+python run_ceiling_ladder.py --restarts 6         # time-homogeneous ladder only
 ```
+
+`run_ceiling_ladder.py` does **not** import `decompose` and therefore cannot
+produce the time-vs-component result or the horizon sweep. Use
+`run_decomposition.py` for anything reported as the headline finding.
 
 ## What is computed
 
@@ -76,7 +86,8 @@ family from every smaller solved family fixes it by construction.
 Instance: N=8 Delta nodes, `c = [8,8,8,8,4,4,4,4]`, `C_min = 12`, 15-minute
 steps, calibrated to A100 MTTR 0.88 h and 0.60% node unavailability.
 
-Optimality gap at a two-hour mission (`p_T = 6.7406e-3`):
+Optimality gap at a two-hour mission (`p_T = 6.7406e-3`), from
+`run_decomposition.py`:
 
 | family | params | time | component | exact ceiling |
 |---|---|---|---|---|
@@ -86,12 +97,20 @@ Optimality gap at a two-hour mission (`p_T = 6.7406e-3`):
 | time_class | 16 | yes | yes | 8.8101 |
 | h-transform | — | yes | full joint state | infinite |
 
+The time-homogeneous ladder from `run_ceiling_ladder.py` (`src_results.json`) is
+a separate, coarser cut of the same instance: `per_component` reproduces `class`
+at 3.4548 exactly, confirming that the symmetry reduction is lossless, and
+`per_comp_repair` reaches **>= 4.479** at 6 restarts. That last figure is a
+LOWER BOUND, not a ceiling: it still fails the symmetry invariant
+(`sym_violation 0.077`), so the optimiser has not converged. Do not quote it as
+a ceiling without that caveat.
+
 Collapse with mission length (system fixed, only `T` varies):
 
 | T | job | p_T | scalar | class | time_scalar | winner |
 |---|---|---|---|---|---|---|
 | 2 | 0.5 h | 7.90e-8 | 5.04e4 | **2.02e6** | 3.08e5 | component, 6.6x |
-| 3 | 0.75 h | 2.35e-6 | 146.3 | **1325** | 1121 | component, 1.18x |
+| 3 | 0.75 h | 1.97e-5 | 146.3 | **1325** | 1121 | component, 1.18x |
 | 4 | 1.0 h | 2.09e-4 | 17.53 | 62.56 | **133.9** | time, 2.14x |
 | 6 | 1.5 h | 2.08e-3 | 4.45 | 7.35 | **15.70** | time, 2.14x |
 | 8 | 2.0 h | 6.74e-3 | 2.66 | 3.46 | **6.04** | time, 1.75x |
@@ -100,6 +119,16 @@ Every product-form ceiling collapses monotonically with mission length, and the
 two knowledge axes exchange dominance at a crossover between T=3 and T=4.
 Production HPC jobs run for hours, i.e. squarely in the regime where
 product-form proposals fail.
+
+All rows were re-evaluated in extended precision (`gate_precision` in
+`run_decomposition.py`); float64 and longdouble agree to between 2e-16 and
+2e-15, so the short-horizon figures are not cancellation artefacts despite
+`p_T` reaching 7.9e-8.
+
+The time/component **interaction is also horizon-dependent**, so do not
+generalise it: at T=8 the two axes compose super-multiplicatively (predicted
+1.297 x 2.268 = 2.942, measured 3.308, +12%), but at T=4 they compose
+sub-multiplicatively (measured 23.99 against a predicted 27.24, -12%).
 
 ## Open: the tilt-ordering reversal
 
@@ -129,6 +158,20 @@ proposal remains unexplained and should not be interpreted on a poster.
   impossible for a fixed system.
 - The capacity-planning chain uses **node** availability while `F` is defined at
   **job** level. State the proxy explicitly or redefine `F`.
+
+## Reproducing the reported numbers
+
+```bash
+cd framework/dynamic_model
+python run_decomposition.py  --restarts 2 --out decomposition.json   # headline
+python run_ceiling_ladder.py --restarts 6 --out src_results.json     # homogeneous ladder
+```
+
+Both JSON files are committed. Every table above is a direct read of one of
+them; nothing is transcribed by hand. (An earlier draft of this README quoted
+`p_T = 2.35e-6` at T=3, a hand-typed value that had never been computed — the
+correct figure, 1.97e-5, comes from `run_decomposition.py`. Read numbers out of
+the JSON, not out of memory.)
 
 ## Not included
 
