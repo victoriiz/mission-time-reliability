@@ -26,10 +26,6 @@ framework/dynamic_model/
   run_ceiling_ladder.py  time-homogeneous ladder only (scalar/per_component/+repair)
 ```
 
-**Every module uses flat imports, so both drivers must live beside `model.py`.**
-Moving them to a sibling `experiments/` directory fails with
-`ModuleNotFoundError: No module named 'model'`.
-
 ```bash
 pip install -r requirements.txt
 cd framework/dynamic_model
