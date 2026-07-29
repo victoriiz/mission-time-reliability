@@ -1,188 +1,262 @@
-# Mission-Time Rare-Event Estimation with Exact Proposal Ceilings
+# Exact Variance Ceilings for Mission-Time Rare-Event Estimation
 
-Exact variance ceilings for importance-sampling proposals on finite-horizon
-Markov models of degrading systems, calibrated to Delta/DeltaAI GPU-cluster
-operational data.
+**Victoria Zhang** · Phuong Cao (advisor) · R. Srikant (advisor)
+University of Illinois Urbana–Champaign · National Center for Supercomputing Applications
+---
 
-**The question this answers.** Practitioners report achieved variance-reduction
-factors with no reference: a 400x speedup may be near-optimal or may be leaving
-four orders of magnitude on the table. This code computes, exactly and without
-sampling, the best variance reduction an entire *family* of proposals can ever
-achieve. It is a measuring instrument, not an estimator — it never returns an
-estimate of the failure probability.
+## What problem is this?
+
+A large GPU job fails if too many of its nodes go down before it finishes. That's
+rare — about 1 in 148 missions on our instance — so measuring it by simulation
+needs roughly **1.5 million simulated missions**.
+
+The standard fix is **importance sampling**: deliberately simulate a distorted
+world where failures are common, then correct each run with a likelihood-ratio
+weight. It works. The unsolved practical problem is different:
+
+> Someone reports "our proposal achieved 400× variance reduction."
+> **Is that good?** Maybe the best possible was 420× and they nearly nailed it.
+> Maybe it was 10⁶× and they left four orders of magnitude on the table.
+> There is no reference.
+
+**This repository computes that missing reference.** For any *family* of
+proposals it returns the best variance reduction any member could ever achieve —
+exactly, in closed form, without drawing a single sample. It is a measuring
+instrument, not an estimator: it never returns a probability.
+
+---
+
+## The three findings
+
+**1. Product-form proposal quality collapses with mission length.**
+The most expressive product-form family falls from $2.7\times10^{6}$ to $8.8$ as
+missions go from 30 minutes to 2 hours — five orders of magnitude. Short missions
+have essentially *one* dominant failure path that a fixed tilt can target; long
+missions have many, and no time-homogeneous proposal can cover them. **Production
+HPC jobs run for hours, which is exactly the regime where these methods fail.**
+
+**2. What you need to know flips, and the cascade sets when.**
+The optimal proposal knows two things: *which* node to drive and *when* to drive
+it. Their relative value exchanges at a crossover, and its location scales with
+the overload-cascade strength γ:
+
+| γ | crossover T | job length | γ · T_cross |
+|---|---|---|---|
+| 0.30 | ≈ 3.2 | 0.8 h | 0.95 |
+| 0.10 | ≈ 11 | 2.75 h | 1.10 |
+| 0.05 | > 14 (predicted ≈ 21) | > 3.5 h | — |
+
+So **T_cross ≈ 1/γ**. The ordering at any single operating point is *not* a law
+— but the scaling is, and the mechanism is that the cascade is what makes timing
+matter.
+
+**3. The one uncalibrated parameter dominates the operational answer.**
+Every rate is calibrated to published Delta figures except γ, which was chosen.
+It swings the failure probability over **eleven orders of magnitude**
+(8.75e-14 to 5.66e-3 for a 12-node pool). We therefore report sensitivity, not a
+point estimate. Calibrating γ against failure-rate-by-scale data is the
+highest-value next step.
+
+---
+
+## Run it yourself
+
+```bash
+pip install -r requirements.txt          # numpy, scipy
+cd framework/dynamic_model
+```
+
+**Start here — 5 seconds.** Confirms the model is sound:
+
+```bash
+python3 model.py
+```
+
+Expect `p_fail: 0.00633466…`, with `rows_sum_to_1` and `dp_matches_sim` both
+`True`. (`is_concentrated` is `False` here — this N=3 reference has 3 of 8 states
+failing, and concentration only becomes meaningful at the N=8 working instance,
+where it is 15 of 256. The gate is checked where it matters.) The second block is
+the deliberately *easy* lumpable case, shown for contrast: identical parameters,
+homogeneous capacities, and the state space collapses.
+
+**Finding 1 and 2 — about 2 minutes.** The decomposition and horizon sweep:
+
+```bash
+python3 run_decomposition.py --restarts 2 --out decomposition.json
+```
+
+Watch for: the recursion matching brute-force enumeration to ~1e-16, the
+h-transform auditing to bias +0.0000% and ESS 1.0000, then the four-rung ladder
+and the collapse across horizons.
+
+**Finding 2 and 3 — about 5 minutes.** Cascade-strength robustness:
+
+```bash
+python3 run_gamma_sensitivity.py --out gamma_sensitivity.json
+```
+
+Prints the crossover location per γ (with the γ·T_cross scaling check), the
+eleven-order-of-magnitude γ sweep, and the provisioning question asked directly.
+
+**Optional — the time-homogeneous ladder** (coarser cut, kept for comparison):
+
+```bash
+python3 run_ceiling_ladder.py --restarts 6 --out src_results.json
+```
+
+**Optional — figures** (regenerates the poster panels):
+
+```bash
+cd ../../poster && python3 make_figures.py && pdflatex poster.tex
+```
+
+> ⚠️ **Both drivers must sit beside `model.py`.** Every module uses flat imports,
+> so moving them to a sibling `experiments/` directory fails with
+> `ModuleNotFoundError: No module named 'model'`.
+
+> ⚠️ **Python 3.14 may not have scipy wheels yet.** If `pip install` fails, use
+> `python3.12 -m venv .venv && source .venv/bin/activate`.
+
+---
+
+## How it works
+
+For any Markov proposal `Q`, with `R = P²/Q`, the estimator's second moment obeys
+a backward recursion that **stops at first entry to the failure set F**:
+
+```
+M₀(x) = 0
+Mₛ(x) = Σ_{y∈F} R(x,y) + Σ_{y∉F} R(x,y) Mₛ₋₁(y)
+Var   = M_T(start) − p_T²
+```
+
+Optimising this over a family's parameters gives that family's **ceiling**.
+
+**Mission failure is a hitting event, so reweighting stops the moment you enter
+F.** Getting this wrong previously biased our provably zero-variance proposal by −11.5%.
+The exact ceiling *cannot* detect that error, since it assumes the estimator is
+implemented correctly. Only the sampling audit caught it.
+
+**Four nested families**, chosen so the optimality gap decomposes:
+
+| family | params | knows *when*? | knows *which node*? |
+|---|---|---|---|
+| scalar | 1 | no | no |
+| + component | 2 | no | yes |
+| + time | 8 | yes | no |
+| + both | 16 | yes | yes |
+| h-transform | — | yes | full joint state (optimal) |
+
+Exchangeable nodes must receive equal tilts at any optimum, so parameterising by
+class is **exact**, shrinking the top family from 64
+parameters to 16.
+
+---
+
+## Correctness
+
+Every gate runs automatically before any number is reported.
+
+| gate | expected | why it matters |
+|---|---|---|
+| recursion vs brute-force path enumeration | ~1e-16 | the variance formula is right |
+| time-varying vs time-homogeneous recursion | exact | the two code paths agree |
+| backward DP vs naive simulation | within 3σ | the ground truth is right |
+| h-transform audit | bias +0.0000%, ESS 1.0000 | DP + stopping rule + audit all right *simultaneously* |
+| double vs extended precision | ~1e-15 | short-horizon results aren't cancellation artefacts |
+| ladder monotonicity | non-decreasing | nested families can't get worse |
+| symmetry | equal tilts within a class | the optimiser converged |
+
+note that **naive Monte Carlo's *sampled* VRF is 1.074**,
+though it should be exactly 1.000 (it is the baseline, compared to itself). That
+7% error is the noise floor of a 20-trial estimate. It is why we report the exact
+ceiling and use sampling only to check bias.
+
+---
 
 ## Layout
 
 ```
 framework/dynamic_model/
-  model.py               exact ground truth: backward DP, h-transform, validation gates
-  proposals.py           odds-tilt proposal families + the h-transform sequence
-  ceiling.py             exact second-moment recursion; family ceilings; brute-force check
-  decompose.py           time-varying recursion; the time-vs-component decomposition
-  audit.py               trajectory sampling audit with the stop-at-F rule
-  delta_calibration.py   Delta/DeltaAI parameters + the capacity-planning payoff
-  diagnose_tilt.py       minimal-cut geometry; the tilt-ordering diagnostic
-  run_decomposition.py   HEADLINE driver: decomposition + horizon sweep
-  run_ceiling_ladder.py  time-homogeneous ladder only (scalar/per_component/+repair)
+  model.py                    exact ground truth: backward DP, h-transform, gates
+  proposals.py                odds-tilt families + the h-transform sequence
+  ceiling.py                  exact second-moment recursion, family ceilings
+  decompose.py                time-varying recursion, the time-vs-component split
+  audit.py                    trajectory sampling audit (stop-at-F rule)
+  delta_calibration.py        Delta/DeltaAI parameters, provisioning arithmetic
+  diagnose_tilt.py            minimal-cut geometry, tilt-ordering diagnostic
+  run_decomposition.py        DRIVER: decomposition + horizon sweep
+  run_gamma_sensitivity.py    DRIVER: cascade robustness + crossover scaling
+  run_ceiling_ladder.py       DRIVER: time-homogeneous ladder only
 ```
 
-```bash
-pip install -r requirements.txt
-cd framework/dynamic_model
-python model.py                                   # validation gates
-python run_decomposition.py --restarts 2          # headline: decomposition + sweep
-python run_ceiling_ladder.py --restarts 6         # time-homogeneous ladder only
-```
+`model.py` keeps `_build_transition_matrix_naive` alongside the vectorised
+version so the fast path stays checkable; they are bit-identical, and the
+vectorised one makes N=12 build in ~1 s instead of minutes.
 
-`run_ceiling_ladder.py` does **not** import `decompose` and therefore cannot
-produce the time-vs-component result or the horizon sweep. Use
-`run_decomposition.py` for anything reported as the headline finding.
+---
 
-## What is computed
+## Scope — what is and isn't claimed
 
-For any Markov proposal `Q`, the single-sample variance of the mission-time IS
-estimator obeys a backward second-moment recursion, stopping at first entry to
-the failure set `F`:
+**Not claimed.** The second-moment-as-value-function formulation is Dupuis &
+Wang; the inadequacy of state-independent proposals is Glasserman & Kou.
 
-```
-R(x,y) = P(x,y)^2 / Q(x,y)
-M_0(x) = 0
-M_s(x) = sum_{y in F} R(x,y) + sum_{y not in F} R(x,y) M_{s-1}(y)
-Var    = M_T(start) - p_T^2
-```
+**Claimed.** An exact instantiation on a finite-horizon **hitting-event** chain
+(prior work goes asymptotic, or targets terminal-time events); a decomposition of
+the optimality gap that is well posed *only* in finite horizon, since the
+infinite-horizon committor literature has no clock; and a measured collapse plus
+crossover scaling on a model calibrated to production HPC data.
 
-Optimising this over a family's parameters gives the family's ceiling.
+This is a careful transfer and measurement, not a new method.
 
-**Mission failure is a HITTING event, so reweighting stops at first entry to F.**
-Continuing past the hit biases the estimator even for a provably zero-variance
-proposal; in development this produced -11.5% bias on the h-transform. The exact
-ceiling cannot detect that error. Only the sampling audit can. Keep both.
+**Limitations.**
 
-## Correctness gates
+- Everything is O(2^N). The toy scale of this project is deliberate, as it is what lets us know the
+  exact answer, and it is what precludes scaling claims.
+- Parameters are *calibrated to* published summary statistics, **not validated
+  against** telemetry. γ is not calibrated at all.
+- The horizon sweep varies T and p_T together; holding both fixed is impossible
+  for a fixed system.
+- The provisioning identity uses *node* availability while F is *job*-level, so
+  that one derived figure uses job-mission failure as an explicit proxy. Nothing
+  else in the project depends on it. `run_gamma_sensitivity.py` experiment C asks
+  the question directly instead, with no proxy.
 
-Every one of these runs in the driver and must pass before results are reported:
+**Open.** The time-homogeneous optimum drives 8-GPU nodes harder (2.298 vs
+1.475); the time-varying optimum at step 0 drives 4-GPU nodes harder (31.04 vs
+9.98). `diagnose_tilt.py` refutes the natural explanation that it tracks the
+failure set's minimal cuts, but this is largely unexplained.
 
-| gate | expected |
-|---|---|
-| recursion vs brute-force path enumeration | agreement to ~1e-16 |
-| time-varying recursion vs time-homogeneous | exact |
-| backward DP vs naive simulation | within 3 sigma |
-| h-transform audit | bias +0.0000%, ESS 1.0000 |
-| double vs extended precision | agreement to ~1e-15 |
-| ladder monotonicity (nested families) | non-decreasing ceilings |
-| symmetry (exchangeable components) | equal tilts |
-
-The last two are not decoration. A naive Nelder-Mead run on the 16-parameter
-family returned a ceiling *below* the 8-parameter family that contains it —
-impossible, and caught only by the monotonicity invariant. Warm-starting each
-family from every smaller solved family fixes it by construction.
-
-## Headline results
-
-Instance: N=8 Delta nodes, `c = [8,8,8,8,4,4,4,4]`, `C_min = 12`, 15-minute
-steps, calibrated to A100 MTTR 0.88 h and 0.60% node unavailability.
-
-Optimality gap at a two-hour mission (`p_T = 6.7406e-3`), from
-`run_decomposition.py`:
-
-| family | params | time | component | exact ceiling |
-|---|---|---|---|---|
-| scalar | 1 | no | no | 2.6634 |
-| class | 2 | no | yes | 3.4548 |
-| time_scalar | 8 | yes | no | 6.0419 |
-| time_class | 16 | yes | yes | 8.8101 |
-| h-transform | — | yes | full joint state | infinite |
-
-The time-homogeneous ladder from `run_ceiling_ladder.py` (`src_results.json`) is
-a separate, coarser cut of the same instance: `per_component` reproduces `class`
-at 3.4548 exactly, confirming that the symmetry reduction is lossless, and
-`per_comp_repair` reaches **>= 4.479** at 6 restarts. That last figure is a
-LOWER BOUND, not a ceiling: it still fails the symmetry invariant
-(`sym_violation 0.077`), so the optimiser has not converged. Do not quote it as
-a ceiling without that caveat.
-
-Collapse with mission length (system fixed, only `T` varies):
-
-| T | job | p_T | scalar | class | time_scalar | winner |
-|---|---|---|---|---|---|---|
-| 2 | 0.5 h | 7.90e-8 | 5.04e4 | **2.02e6** | 3.08e5 | component, 6.6x |
-| 3 | 0.75 h | 1.97e-5 | 146.3 | **1325** | 1121 | component, 1.18x |
-| 4 | 1.0 h | 2.09e-4 | 17.53 | 62.56 | **133.9** | time, 2.14x |
-| 6 | 1.5 h | 2.08e-3 | 4.45 | 7.35 | **15.70** | time, 2.14x |
-| 8 | 2.0 h | 6.74e-3 | 2.66 | 3.46 | **6.04** | time, 1.75x |
-
-Every product-form ceiling collapses monotonically with mission length, and the
-two knowledge axes exchange dominance at a crossover between T=3 and T=4.
-Production HPC jobs run for hours, i.e. squarely in the regime where
-product-form proposals fail.
-
-All rows were re-evaluated in extended precision (`gate_precision` in
-`run_decomposition.py`); float64 and longdouble agree to between 2e-16 and
-2e-15, so the short-horizon figures are not cancellation artefacts despite
-`p_T` reaching 7.9e-8.
-
-The time/component **interaction is also horizon-dependent**, so do not
-generalise it: at T=8 the two axes compose super-multiplicatively (predicted
-1.297 x 2.268 = 2.942, measured 3.308, +12%), but at T=4 they compose
-sub-multiplicatively (measured 23.99 against a predicted 27.24, -12%).
-
-## Open: the tilt-ordering reversal
-
-The time-homogeneous optimum tilts the 8-GPU nodes harder (2.298 vs 1.475); the
-time-varying optimum at step 0 tilts the 4-GPU nodes harder (31.04 vs 9.98).
-
-`diagnose_tilt.py` tests the natural hypothesis — that the ordering tracks the
-composition of the failure set's minimal cuts — and **refutes it**. At
-`C_min = 36` the requirement fractions predict the small nodes should be tilted
-harder (0.419 vs 0.290), but the homogeneous optimum still prefers the large
-nodes (2.499 vs 1.643), the same direction as at `C_min = 12`.
-
-What the test *does* establish: the time-homogeneous preference for large nodes
-is robust across failure-set geometries, consistent with a capacity-per-unit-
-likelihood-ratio-cost argument (failing an 8-GPU node destroys twice the
-capacity for the same tilt cost). The step-0 reversal under a time-varying
-proposal remains unexplained and should not be interpreted on a poster.
-
-## Caveats
-
-- `O(2^N)` throughout; the dense transition matrix is `O(2^{2N})`, putting the
-  practical wall near `N ~ 12`, not `N ~ 20`. Toy scale is deliberate — it is
-  what permits exact validation and what precludes scaling claims.
-- Parameters are **calibrated to** published Delta summary statistics
-  (Cui et al., SC '25, arXiv:2503.11901), **not validated against** telemetry.
-- The horizon sweep varies `T` and `p_T` together; holding both fixed is
-  impossible for a fixed system.
-- The capacity-planning chain uses **node** availability while `F` is defined at
-  **job** level. State the proxy explicitly or redefine `F`.
-
-## Reproducing the reported numbers
-
-```bash
-cd framework/dynamic_model
-python run_decomposition.py  --restarts 2 --out decomposition.json   # headline
-python run_ceiling_ladder.py --restarts 6 --out src_results.json     # homogeneous ladder
-```
-
-Both JSON files are committed. Every table above is a direct read of one of
-them; nothing is transcribed by hand. (An earlier draft of this README quoted
-`p_T = 2.35e-6` at T=3, a hand-typed value that had never been computed — the
-correct figure, 1.97e-5, comes from `run_decomposition.py`. Read numbers out of
-the JSON, not out of memory.)
-
-## Not included
-
-`estimators.py` from the original repository is static-model code: its `audit`,
-`ideal_proposal` and `tilt_family_ceiling` read `model.p`, `model.failmask` and
-`model.component_bits`, which `DynamicModel` does not define. `audit.py` and
-`ceiling.py` are the dynamic replacements. The quantum experiments are
-deliberately excluded.
+---
 
 ## Next
 
 1. Implement AMS and cross-entropy for the trajectory model and price them
-   against the same ceilings — currently there is no approximate classical
+   against the same ceilings. There is currently no approximate classical
    opponent.
-2. Learn `h_t` by temporal-difference methods on instances where exact `h_t` is
-   available from DP, so learning error is measurable exactly.
-3. Determine whether bounded-relative-variance guarantees for LSTD rare-event
-   prediction survive absorbing, state-dependent, irreversible dynamics.
+2. Learn h_t by temporal-difference methods on instances where exact h_t is known
+   from DP, so learning error is measurable *exactly* — a validation almost
+   nobody in that literature can perform.
+3. Calibrate γ against failure-rate-by-scale data so the operational conclusions
+   stop being sensitivity ranges.
+
+## Key References
+
+1. S. Cui et al. *Story of Two GPUs: Characterizing the Resilience of Hopper H100
+   and Ampere A100 GPUs.* SC '25. arXiv:2503.11901 — source of every Delta figure.
+2. J. Blanchet, H. Lam. *State-dependent importance sampling for rare-event
+   simulation.* Surv. Oper. Res. Manag. Sci., 2011 — covers Dupuis–Wang.
+3. P. Glasserman, S.-G. Kou. *Analysis of an importance sampling estimator for
+   tandem queues.* ACM TOMACS, 1995.
+4. F. Cérou, A. Guyader. *Adaptive multilevel splitting.* Stoch. Anal. Appl., 2007.
+5. R. Rubinstein, D. Kroese. *The Cross-Entropy Method.* Springer, 2004.
+6. *The surprising efficiency of TD learning for rare event prediction.*
+   NeurIPS 2024. arXiv:2405.17638 — infinite-horizon; motivates the next phase.
+7. *A unified perspective on exponential tilt and bridge algorithms.*
+   arXiv:2307.12597 — closest prior work; terminal-time, not hitting.
+8. G. Chennetier et al. *Adaptive IS based on fault tree analysis.* SIAM/ASA JUQ.
+   arXiv:2210.16185.
+
+## Acknowledgements
+
+NSF Award No. 2620473 · CRA/NSF DREU · NCSA Delta.
