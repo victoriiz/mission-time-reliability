@@ -254,9 +254,9 @@ and Wang; the inadequacy of state-independent proposals is due to Glasserman and
 Kou.
 
 **Claimed.** An exact instantiation on a finite-horizon *hitting-event* chain,
-where prior work either goes asymptotic or targets terminal-time events; a
-decomposition of the optimality gap that is well posed only in finite horizon,
-since the infinite-horizon committor literature has no clock; and measurement on
+(where prior work either goes asymptotic or targets terminal-time events), a
+decomposition of the optimality gap that is well posed only in finite horizon
+(since the infinite-horizon committor literature has no clock), and measurement on
 a model calibrated to production HPC data.
 
 **Limitations.**

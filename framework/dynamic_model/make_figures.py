@@ -46,7 +46,7 @@ ax.text(0.90, 2.2e5, "crossover", color="#C0392B", fontsize=11.5, weight="bold")
 ax.text(0.90, 6.0e4, "component $\\to$ time", color="#C0392B", fontsize=10.5)
 ax.set_xlabel("mission length  (hours)")
 ax.set_ylabel("exact variance-reduction ceiling")
-ax.set_title("Raw ceilings fall — but so does $1/p_T$",
+ax.set_title("Collapse of Raw Ceilings with Mission Length",
              fontsize=14.5, weight="bold", pad=12)
 ax.set_ylim(1, 2e7)
 ax.legend(loc="upper right", frameon=True, framealpha=0.95, fontsize=12,
@@ -86,7 +86,7 @@ print("wrote figs/collapse.pdf and figs/schedule.pdf")
 # For a scheme with bounded relative error, Var ~ c p^2, so VRF ~ 1/(c p).
 # 1/p is therefore the natural scale of any VRF, and it falls five orders of
 # magnitude on its own as the event becomes less rare. Dividing it out separates
-# the trivial part of the "collapse" from the real part -- and the real part is
+# the trivial part of the "collapse" from the real part, and spoiler the real part is
 # NOT a collapse. Efficiency stays inside one order of magnitude. What actually
 # changes is which knowledge axis leads.
 fig, ax = plt.subplots(figsize=(7.4, 5.2))
@@ -106,7 +106,7 @@ ax.text(1.30, 0.0108, "efficiency stays within one order of magnitude:\n"
         fontsize=10.5, style="italic", va="top")
 ax.set_xlabel("mission length  (hours)")
 ax.set_ylabel("relative efficiency   $\\mathrm{VRF}\\times p_T$")
-ax.set_title("Normalised for rarity: the ordering changes, the level does not",
+ax.set_title("Efficiency Normalized for Rarity",
              fontsize=12.5, weight="bold", pad=12)
 ax.set_ylim(6e-3, 0.4)
 ax.legend(loc="upper right", frameon=True, fontsize=11.5)
