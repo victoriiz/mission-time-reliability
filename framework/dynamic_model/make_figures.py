@@ -1,4 +1,4 @@
-"""Poster figures. Reads the sweep + schedule and emits figs/*.pdf."""
+"""Poster figures."""
 import json, os
 import numpy as np
 import matplotlib
@@ -34,6 +34,8 @@ for k, lab, mk, ls in series:
     ax.plot(hrs, [SWEEP[t][k] for t in Ts], marker=mk, ls=ls, lw=2.6, ms=9,
             color=C[k], label=lab, zorder=3)
 ax.set_yscale("log")
+ax.plot(hrs, [1.0 / SWEEP[t]["p"] for t in Ts], color="#777", lw=1.8, ls="-.",
+        zorder=2, label="$1/p_T$  (bounded-rel-error scale)")
 ax.axhline(1.0, color="k", lw=1.0, ls=":", zorder=1)
 ax.text(0.55, 1.30, "naive Monte Carlo  (VRF $=1$)", fontsize=11, color="k")
 ax.axhspan(3e6, 2e7, color="#2E5E9E", alpha=0.07, zorder=0)
@@ -44,7 +46,7 @@ ax.text(0.90, 2.2e5, "crossover", color="#C0392B", fontsize=11.5, weight="bold")
 ax.text(0.90, 6.0e4, "component $\\to$ time", color="#C0392B", fontsize=10.5)
 ax.set_xlabel("mission length  (hours)")
 ax.set_ylabel("exact variance-reduction ceiling")
-ax.set_title("Every product-form ceiling collapses with mission length",
+ax.set_title("Raw ceilings fall — but so does $1/p_T$",
              fontsize=14.5, weight="bold", pad=12)
 ax.set_ylim(1, 2e7)
 ax.legend(loc="upper right", frameon=True, framealpha=0.95, fontsize=12,
@@ -78,3 +80,38 @@ ax.legend(frameon=True, fontsize=11.5, loc="upper right",
 ax.grid(alpha=0.25, which="both", ls=":")
 fig.tight_layout(); fig.savefig("figs/schedule.pdf"); plt.close(fig)
 print("wrote figs/collapse.pdf and figs/schedule.pdf")
+
+
+# ---------------- panel C: NORMALISED efficiency ----------------------
+# For a scheme with bounded relative error, Var ~ c p^2, so VRF ~ 1/(c p).
+# 1/p is therefore the natural scale of any VRF, and it falls five orders of
+# magnitude on its own as the event becomes less rare. Dividing it out separates
+# the trivial part of the "collapse" from the real part -- and the real part is
+# NOT a collapse. Efficiency stays inside one order of magnitude. What actually
+# changes is which knowledge axis leads.
+fig, ax = plt.subplots(figsize=(7.4, 5.2))
+for k, lab, mk in [("cls", "component knowledge", "s"),
+                   ("tsc", "time knowledge", "^")]:
+    ax.plot(hrs, [SWEEP[t][k] * SWEEP[t]["p"] for t in Ts], marker=mk, lw=2.8,
+            ms=10, color=C[k], label=lab, zorder=3)
+ax.plot(hrs, [SWEEP[t]["scalar"] * SWEEP[t]["p"] for t in Ts], marker="o",
+        lw=2.0, ls="--", ms=7, color=C["scalar"], label="scalar baseline",
+        zorder=2)
+ax.set_yscale("log")
+ax.axvline(0.875, color="#C0392B", lw=1.6, ls="--", zorder=1)
+ax.text(0.90, 0.075, "crossover", color="#C0392B", fontsize=12, weight="bold")
+ax.axhspan(0.010, 0.045, color="k", alpha=0.055, zorder=0)
+ax.text(1.30, 0.0108, "efficiency stays within one order of magnitude:\n"
+        "the raw five-order collapse is the $1/p_T$ scale, not degradation",
+        fontsize=10.5, style="italic", va="top")
+ax.set_xlabel("mission length  (hours)")
+ax.set_ylabel("relative efficiency   $\\mathrm{VRF}\\times p_T$")
+ax.set_title("Normalised for rarity: the ordering changes, the level does not",
+             fontsize=12.5, weight="bold", pad=12)
+ax.set_ylim(6e-3, 0.4)
+ax.legend(loc="upper right", frameon=True, fontsize=11.5)
+ax.grid(alpha=0.25, which="both", ls=":")
+sec = ax.secondary_xaxis("top", functions=(lambda x: x / 0.25, lambda x: x * 0.25))
+sec.set_xlabel("mission length  $T$  (steps)", fontsize=12)
+fig.tight_layout(); fig.savefig("figs/efficiency.pdf"); plt.close(fig)
+print("wrote figs/efficiency.pdf")
