@@ -101,9 +101,9 @@ ax.set_yscale("log")
 ax.axvline(0.875, color="#C0392B", lw=1.6, ls="--", zorder=1)
 ax.text(0.90, 0.075, "crossover", color="#C0392B", fontsize=12, weight="bold")
 ax.axhspan(0.010, 0.045, color="k", alpha=0.055, zorder=0)
-ax.text(1.30, 0.0108, "efficiency stays within one order of magnitude:\n"
-        "the raw five-order collapse is the $1/p_T$ scale, not degradation",
-        fontsize=10.5, style="italic", va="top")
+#ax.text(1.30, 0.0108, "efficiency stays within one order of magnitude:\n"
+        #"the raw five-order collapse is the $1/p_T$ scale, not degradation",
+        #fontsize=10.5, style="italic", va="top")
 ax.set_xlabel("mission length  (hours)")
 ax.set_ylabel("relative efficiency   $\\mathrm{VRF}\\times p_T$")
 ax.set_title("Efficiency Normalized for Rarity",
