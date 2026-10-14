@@ -1,0 +1,138 @@
+{
+  "rates_mode": "lecture",
+  "baseline": {
+    "config": {
+      "nodes": 160,
+      "gpus_per_node": 4,
+      "required_gpus": 608,
+      "steps": 7200,
+      "step_hours": 0.1,
+      "failure_probability": 0.00034,
+      "repair_probability": 0.044,
+      "gamma": 0,
+      "eta": 0
+    },
+    "spares": 8,
+    "mission_hours": 720.0,
+    "safe_count_states": 9,
+    "failure_probability": 0.00894375028429272,
+    "mission_reliability": 0.9910562497132505,
+    "overprovision_fraction": 0.05263157894736836
+  },
+  "spare_sweep": [
+    {
+      "config": {
+        "nodes": 152,
+        "gpus_per_node": 4,
+        "required_gpus": 608,
+        "steps": 7200,
+        "step_hours": 0.1,
+        "failure_probability": 0.00034,
+        "repair_probability": 0.044,
+        "gamma": 0,
+        "eta": 0
+      },
+      "spares": 0,
+      "mission_hours": 720.0,
+      "safe_count_states": 1,
+      "failure_probability": 1.0,
+      "mission_reliability": 2.3620134292069236e-162,
+      "overprovision_fraction": 0.0
+    },
+    {
+      "config": {
+        "nodes": 156,
+        "gpus_per_node": 4,
+        "required_gpus": 608,
+        "steps": 7200,
+        "step_hours": 0.1,
+        "failure_probability": 0.00034,
+        "repair_probability": 0.044,
+        "gamma": 0,
+        "eta": 0
+      },
+      "spares": 4,
+      "mission_hours": 720.0,
+      "safe_count_states": 5,
+      "failure_probability": 0.99827539813126,
+      "mission_reliability": 0.001724601868444455,
+      "overprovision_fraction": 0.026315789473684292
+    },
+    {
+      "config": {
+        "nodes": 158,
+        "gpus_per_node": 4,
+        "required_gpus": 608,
+        "steps": 7200,
+        "step_hours": 0.1,
+        "failure_probability": 0.00034,
+        "repair_probability": 0.044,
+        "gamma": 0,
+        "eta": 0
+      },
+      "spares": 6,
+      "mission_hours": 720.0,
+      "safe_count_states": 7,
+      "failure_probability": 0.28047958559731084,
+      "mission_reliability": 0.7195204144008314,
+      "overprovision_fraction": 0.03947368421052633
+    },
+    {
+      "config": {
+        "nodes": 160,
+        "gpus_per_node": 4,
+        "required_gpus": 608,
+        "steps": 7200,
+        "step_hours": 0.1,
+        "failure_probability": 0.00034,
+        "repair_probability": 0.044,
+        "gamma": 0,
+        "eta": 0
+      },
+      "spares": 8,
+      "mission_hours": 720.0,
+      "safe_count_states": 9,
+      "failure_probability": 0.00894375028429272,
+      "mission_reliability": 0.9910562497132505,
+      "overprovision_fraction": 0.05263157894736836
+    },
+    {
+      "config": {
+        "nodes": 162,
+        "gpus_per_node": 4,
+        "required_gpus": 608,
+        "steps": 7200,
+        "step_hours": 0.1,
+        "failure_probability": 0.00034,
+        "repair_probability": 0.044,
+        "gamma": 0,
+        "eta": 0
+      },
+      "spares": 10,
+      "mission_hours": 720.0,
+      "safe_count_states": 11,
+      "failure_probability": 0.00015204243986785434,
+      "mission_reliability": 0.9998479575596482,
+      "overprovision_fraction": 0.06578947368421062
+    },
+    {
+      "config": {
+        "nodes": 164,
+        "gpus_per_node": 4,
+        "required_gpus": 608,
+        "steps": 7200,
+        "step_hours": 0.1,
+        "failure_probability": 0.00034,
+        "repair_probability": 0.044,
+        "gamma": 0,
+        "eta": 0
+      },
+      "spares": 12,
+      "mission_hours": 720.0,
+      "safe_count_states": 13,
+      "failure_probability": 1.7761550836244071e-06,
+      "mission_reliability": 0.9999982238460119,
+      "overprovision_fraction": 0.07894736842105265
+    }
+  ]
+}
