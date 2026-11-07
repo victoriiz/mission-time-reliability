@@ -114,16 +114,15 @@ Prints the recursion checks, the h-transform gate, the four-rung decomposition a
 the reference horizon, and the horizon sweep with an extended-precision check at
 each point.
 
-**Findings 2 and 3, about 5 minutes:**
 
 ```bash
 python3 run_gamma_sensitivity.py --out gamma_sensitivity.json
 ```
 
-Three experiments. (A) locates the crossover per γ by log-interpolating the
+ (A) locates the crossover per γ by log-interpolating the
 ratio, reporting "no crossover in the scanned range" where none exists. (B)
 sweeps γ against pool size to show the eleven-order spread. (C) asks the
-provisioning question directly, with no node-versus-job proxy.
+provisioning question directly.
 
 To reproduce the γ=0.05 result specifically, which needs long horizons:
 
